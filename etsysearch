@@ -1,0 +1,71 @@
+import requests
+import json
+import pandas as pd
+from datetime import datetime
+
+headers = {'x-api-key': 'PUT YOUR API KEY HERE'}
+
+def keywordall():
+    keyword = input("Enter a keyword to search for: ")
+    min_price_str = input("Enter a minimum price (leave blank for no minimum): ")
+    max_price_str = input("Enter a maximum price (leave blank for no maximum): ")
+    try:
+        min_price = float(min_price_str)
+    except ValueError:
+        min_price = None
+    try:
+        max_price = float(max_price_str)
+    except ValueError:
+        max_price = None
+    
+    data_rows = []
+    offset = 0
+
+    while True:
+        url = f'https://openapi.etsy.com/v3/application/listings/active?keywords={keyword}&limit=100&offset={offset}&includes=Images,Shop'
+        if min_price is not None:
+            url += f'&min_price={min_price}'
+        if max_price is not None:
+            url += f'&max_price={max_price}'
+        r = requests.get(url, headers=headers).text
+        data = json.loads(r)
+        if not data.get('results'):
+            break
+        for result in data['results']:
+            listing_id = result.get('listing_id')
+            title = result['title']
+            favs = result.get('num_favorers')
+            
+            # Retrieve the listing price and currency code
+            price_info = result.get('price')
+            if price_info:
+                amount = price_info.get('amount')
+                divisor = price_info.get('divisor')
+                price = amount / divisor
+                currency = price_info.get('currency_code')
+            else:
+                price = ''
+                currency = ''
+            url = result.get('url')
+
+            
+
+            # Append the row to the data_rows list
+            row = [listing_id, title, price, currency, favs, url]
+            data_rows.append(row)
+            print(row)
+        offset += 100
+        if offset >= 1000:
+            break
+
+    # Convert the data to a pandas DataFrame
+    df = pd.DataFrame(data_rows, columns=['Listing ID', 'Title', 'Price', 'Currency', 'Favs', 'URL'])
+
+    # Write the data to an Excel file
+    with pd.ExcelWriter(f'{keyword}_Done.xlsx') as writer:
+        df.to_excel(writer, index=False)
+
+    return df
+
+# Example usage: prompt the user for keyword, minimum price, and maximum price
+keywordall()
